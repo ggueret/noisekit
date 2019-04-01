@@ -3,16 +3,7 @@ import queue
 import threading
 import subprocess
 from . import BaseThread
-
-
-def read_in_chunks(file_obj, chunk_size=1024):
-    while True:
-        chunk = file_obj.read(chunk_size)
-
-        if not chunk:
-            return
-
-        yield chunk
+from ..utils import chunked_read
 
 
 class Sound(object):
@@ -26,15 +17,19 @@ class Sound(object):
 
 
 class OutputProducer(BaseThread):
+    """A producer will spawn a player and pass it a queued sound bytes through a pipe"""
 
-    def __init__(self, queue, beat_every=None, beat_sound=None):
+    def __init__(self, beat_every=None, beat_sound=None):
         super().__init__()
-        self.queue = queue
+        self.queue = queue.Queue()  # todo: consider queue.PriorityQueue() for level priority
         self.last_active = 0
         self.is_active = threading.Event()
 
         self.beat_every = beat_every
         self.beat_sound = beat_sound
+
+    def enqueue(self, sound):
+        self.queue.put_nowait(sound)
 
     def play(self, sound):
 
@@ -43,7 +38,7 @@ class OutputProducer(BaseThread):
         process = subprocess.Popen(["/Applications/VLC.app/Contents/MacOS/VLC", "--play-and-exit", "-"], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
 
         with open(sound["path"], "rb") as f:
-            for chunk in read_in_chunks(f):
+            for chunk in chunked_read(f):
                 process.stdin.write(chunk)
 
         process.communicate()
@@ -65,10 +60,7 @@ class OutputProducer(BaseThread):
             if sound is None:
                 break
 
-            #todo: use a formatter to get thread id
-            self.logger.info("got sound into OutputProducer(%i): %s", threading.get_ident(), sound)
-
             self.play(sound)
             self.queue.task_done()
 
-        self.logger.info("stopped OutputProducer(%i).", threading.get_ident())
+        self.logger.info("stopped Output Producer.")

@@ -11,6 +11,16 @@ except ImportError:
     from itertools import izip_longest as zip_longest
 
 
+def chunked_read(file_obj, size=None):
+    while True:
+        chunk = file_obj.read(1024 if size is None else size)
+
+        if not chunk:
+            return
+
+        yield chunk
+
+
 class ChoiceIterator(object):
 
     def __init__(self, values):
