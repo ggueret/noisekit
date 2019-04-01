@@ -6,7 +6,7 @@ import numpy
 from termcolor import colored
 from . import levels, config
 from .logging import get_logger
-from .audio import InputConsumer
+from .audio.input import InputConsumer
 
 
 class Visualizer(InputConsumer):

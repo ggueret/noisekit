@@ -9,7 +9,7 @@ import subprocess
 from itertools import cycle
 from . import levels, states
 from .logging import get_logger
-from .audio import InputConsumer
+from .audio.input import InputConsumer
 from .utils import ChoiceIterator
 from . import generate
 
