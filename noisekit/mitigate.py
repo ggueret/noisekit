@@ -6,10 +6,13 @@ import audioop
 import tempfile
 import subprocess
 
+from queue import Queue
+
 from itertools import cycle
 from . import levels, states
 from .logging import get_logger
 from .audio.input import InputConsumer
+from .audio.output import OutputProducer
 from .utils import ChoiceIterator
 from . import generate
 
@@ -57,7 +60,6 @@ class Mitigator(InputConsumer):
             self.sounds[level] = picker(sounds)
 
         self.record_to = kwargs.pop("record")  # todo
-        self.is_alive = None
         self.is_quiet = None
         self.is_beating = None
         self.is_psycho = kwargs.pop("psycho_mode")
@@ -69,13 +71,6 @@ class Mitigator(InputConsumer):
         self.next_beat = 0
 
         self.last_block_playing = False
-
-    def stop(self, *args):
-        self.is_alive = False
-
-    def register_signals(self):
-        signal.signal(signal.SIGINT, self.stop)
-        signal.signal(signal.SIGTERM, self.stop)
 
     def get_level(self, rms):
         for level in (levels.HIGH, levels.MEDIUM, levels.LOW):
@@ -111,20 +106,24 @@ class Mitigator(InputConsumer):
         return self.player_process and self.player_process.poll() is None
 
     def run(self):
-        self.register_signals()
-        self.is_alive = True
+
+        producer_queue = Queue()
+        producer = OutputProducer(producer_queue)
+        producer.start()
 
         self.logger.info(f"thresholds: low[{self.thresholds['LOW']}] medium[{self.thresholds['MEDIUM']}] high[{self.thresholds['HIGH']}]")
 
         if self.beat_every:
             self.beat()
 
-        while self.is_alive:
+        while not self.shutdown_flag.is_set():
 
-            context = {"state": self.get_state()}
+            context = {}
+            context["state"] = states.PLAYING if producer.is_playing.is_set() else states.LISTENING
+
             samples = self.read(self.frames_per_buffer)
 
-            if context["state"] in (states.BEATING, states.PLAYING) and not self.is_psycho:
+            if context["state"] == states.PLAYING and not self.is_psycho:
                 self.last_block_playing = True
                 continue
 
@@ -142,13 +141,19 @@ class Mitigator(InputConsumer):
 
             if context["staged"]:
                 self.logger.info(f"{context['level']} level reached with {context['amplitude']} RMS @ {context['frequency']} Hz. Playing: '{context['staged']}'.")
-                self.play(context["staged"])
+                producer_queue.put_nowait({"path": context["staged"]})
 
             context["timestamp"] = time.time()
 
-            if self.beat_every and context["timestamp"] - self.last_played >= self.beat_every:
+#            if self.beat_every and context["timestamp"] - self.last_played >= self.beat_every:
 #                self.logger.info("Beating, since no sound has been played from %.2f seconds.", context["timestamp"] - self.last_played)
-                self.beat()
+#                self.beat()
+
+        # wait for the queue to finish all sounds.
+        producer_queue.put(None)
+        # quit now.
+        producer.shutdown_flag.set()
+        producer.join()
 
         # TODO: must be safer.
         for tmpfile in self.tempfiles:

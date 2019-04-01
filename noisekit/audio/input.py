@@ -2,6 +2,7 @@ import numpy
 import pyaudio
 from . import BaseThread
 
+
 class InputConsumer(BaseThread):
 
     def __init__(self, **kwargs):

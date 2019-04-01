@@ -8,6 +8,7 @@ import argparse
 import logging
 
 from .logging import setup_logging
+from .service import Service
 from . import config
 from . import __DESCRIPTION__, __VERSION__
 
@@ -85,7 +86,8 @@ def register_visualize(subparser):
 
     def run(args):
         from .visualize import Visualizer
-        service = Visualizer(**vars(args))
+        visualizer = Visualizer(**vars(args))
+        service = Service(visualizer)
         service.run()
 
     subparser.set_defaults(func=run)
@@ -112,7 +114,8 @@ def register_mitigate(subparser):
 
     def run(args):
         from .mitigate import Mitigator
-        service = Mitigator(**load_settings(args))
+        mitigator = Mitigator(**load_settings(args))
+        service = Service(mitigator)
         service.run()
 
     subparser.set_defaults(func=run)
@@ -216,7 +219,7 @@ def main():
         logging.exception("noisekit exited abruptly:")
         raise
 
-    logging.info("noisekit exited properly.")
+#    logging.info("noisekit exited properly.")
 
 if __name__ == "__main__":
 
