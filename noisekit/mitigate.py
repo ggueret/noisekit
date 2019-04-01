@@ -67,9 +67,6 @@ class Mitigator(InputConsumer):
         self.player_bin = kwargs.pop("player")
         self.player_process = 0
 
-        self.last_played = 0
-        self.next_beat = 0
-
         self.last_block_playing = False
 
     def get_level(self, rms):
@@ -94,7 +91,6 @@ class Mitigator(InputConsumer):
         self.play(self.beat_sound)
 
     def play(self, path):
-        self.last_played = time.time()
 
         if self.is_quiet:
             return
@@ -108,18 +104,15 @@ class Mitigator(InputConsumer):
     def run(self):
 
         producer_queue = Queue()
-        producer = OutputProducer(producer_queue)
+        producer = OutputProducer(producer_queue, beat_every=self.beat_every, beat_sound=self.beat_sound)
         producer.start()
 
         self.logger.info(f"thresholds: low[{self.thresholds['LOW']}] medium[{self.thresholds['MEDIUM']}] high[{self.thresholds['HIGH']}]")
 
-        if self.beat_every:
-            self.beat()
-
         while not self.shutdown_flag.is_set():
 
             context = {}
-            context["state"] = states.PLAYING if producer.is_playing.is_set() else states.LISTENING
+            context["state"] = states.PLAYING if producer.is_active.is_set() else states.LISTENING
 
             samples = self.read(self.frames_per_buffer)
 
@@ -144,10 +137,6 @@ class Mitigator(InputConsumer):
                 producer_queue.put_nowait({"path": context["staged"]})
 
             context["timestamp"] = time.time()
-
-#            if self.beat_every and context["timestamp"] - self.last_played >= self.beat_every:
-#                self.logger.info("Beating, since no sound has been played from %.2f seconds.", context["timestamp"] - self.last_played)
-#                self.beat()
 
         # wait for the queue to finish all sounds.
         producer_queue.put(None)
