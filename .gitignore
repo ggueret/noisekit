@@ -1,0 +1,9 @@
+*.pyc
+.virtualenv/
+.DS_store
+.sublime-project*
+dist/
+fabfile.py
+Makefile
+noisekit.egg-info/
+tasks.py

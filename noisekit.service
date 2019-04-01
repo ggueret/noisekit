@@ -1,0 +1,14 @@
+[Unit]
+Description=noisekit
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/src/noisekit/bin/noisekit mitigate -c /etc/noisekit.conf
+Restart=on-failure
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target
