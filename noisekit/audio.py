@@ -1,11 +1,21 @@
 import wave
 import numpy
+import threading
 import pyaudio
+from .logging import get_logger
 
 
-class InputConsumer(object):
+class BaseThread(threading.Thread):
+
+    def __init__(self):
+        super().__init__()
+        self.shutdown_flag = threading.Event()
+
+
+class InputConsumer(BaseThread):
 
     def __init__(self, **kwargs):
+        super().__init__()
         self.rate = kwargs.pop("rate")
         self.frames_per_buffer = kwargs.pop("frames_per_buffer")
         self.channels = 1  # kwargs.pop("channels")
@@ -60,3 +70,24 @@ class Recorder(object):
 
     def __exit__(self):
         self.wave.close()
+
+
+class OutputProducer(BaseThread):
+
+    def __init__(self, queue):
+        super().__init__()
+        self.queue = queue
+        self.logger = get_logger(__name__)
+
+    def run(self):
+        while not self.shutdown_flag.is_set():
+            sound = self.queue.get()
+
+            if sound is None:
+                break
+
+            #todo: use a formatter to get thread id
+            self.logger.info("got sound into OutputProducer(%i): %s", threading.get_ident(), sound)
+            self.queue.task_done()
+
+        self.logger.info("stopped OutputProducer(%i).", threading.get_ident())
