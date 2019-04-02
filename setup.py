@@ -16,7 +16,7 @@ setup(
     url="https://github.com/ggueret/noisekit",
     license="MIT",
 
-    packages=["noisekit", "noisekit.audio", "noisekit.dummy"],
+    packages=["noisekit", "noisekit.audio", "noisekit.audio.dummy"],
     python_requires=">=3.4",
     install_requires=open(os.path.join(BASEDIR_PATH, "requirements.txt"), "r").read().splitlines(),
     include_package_data=True,
