@@ -11,6 +11,7 @@ from . import levels, states
 from .logging import get_logger
 from .audio.input import InputConsumer
 from .audio.output import OutputProducer
+from .audio.sound import SoundFile, SoundTone
 from .utils import ChoiceIterator
 from . import generate
 
@@ -24,11 +25,9 @@ class Mitigator(InputConsumer):
 
     def __init__(self, **kwargs):
         super(Mitigator, self).__init__(**kwargs)
-
+        # todo: must handle the case where noisekit must exit from there
+        self.producer = OutputProducer(player=kwargs.pop("player"), beat_every=kwargs.pop("beat_every"), beat_sound=kwargs.pop("beat_sound"))
         self.logger = get_logger(__name__)
-        self.tempfiles = []
-
-        self.producer = OutputProducer(beat_every=kwargs.pop("beat_every"), beat_sound=kwargs.pop("beat_sound"))
 
         self.thresholds = {
             levels.LOW: kwargs.pop("low_threshold"),
@@ -40,18 +39,16 @@ class Mitigator(InputConsumer):
         picker = self.PICKERS[kwargs.pop("picking_mode")]
 
         for level in (levels.LOW, levels.MEDIUM, levels.HIGH):
-            sounds = kwargs.pop("{}_sounds".format(level.lower()), None)
+            sounds = []
+
+            for sound_path in kwargs.pop("{}_sounds".format(level.lower()), []):
+                sounds.append(SoundFile(sound_path))
 
             if not sounds:
-                channels = ((generate.sine_wave(kwargs.pop("{}_frequency".format(level.lower())), 44100, 1.0),) for i in range(1))
-                samples = generate.compute_samples(channels, 44100 * 10)
-
-                tmp_file = tempfile.NamedTemporaryFile(delete=False)
-                self.tempfiles.append(tmp_file.name)
-
-                generate.write_wavefile(tmp_file.name, samples, 44100 * 10, 2, 16 // 8, 44100)
-                self.logger.info("written sine wave for level %s, into '%s'", level, tmp_file.name)
-                sounds = [tmp_file.name]
+                sounds.append(SoundTone(
+                    frequency=kwargs.pop("{}_frequency".format(level.lower())),
+                    amplitude=0.5
+                ))
 
             self.sounds[level] = picker(sounds)
 
@@ -92,19 +89,15 @@ class Mitigator(InputConsumer):
             context["level"] = self.get_level(context["amplitude"])
             context["staged"] = None
 
-            if context["level"] is not levels.QUIET and context["frequency"] > 19:
+            #  and context["frequency"] > 19
+            if context["level"] is not levels.QUIET:
                 context["staged"] = next(self.sounds[context["level"]])
 
             if context["staged"]:
                 self.logger.info(f"{context['level']} level reached with {context['amplitude']} RMS @ {context['frequency']} Hz. Playing: '{context['staged']}'.")
-                self.producer.enqueue({"path": context["staged"]})
+                self.producer.enqueue(context["staged"])
 
             context["timestamp"] = time.time()
 
         self.producer.shutdown_flag.set()
         self.producer.join()
-
-        # TODO: must be safer.
-        for tmpfile in self.tempfiles:
-            self.logger.info("remove temporary file: %s", tmpfile)
-            os.unlink(tmpfile)
