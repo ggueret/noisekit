@@ -15,7 +15,7 @@ FORMAT = "Int16"
 PICKING_MODE = "cycle"
 
 if platform.system() == "Darwin":
-    PLAYER = "afplay"
+    PLAYER = "/Applications/VLC.app/Contents/MacOS/VLC --play-and-exit -"
 else:
     PLAYER = "aplay"
 

@@ -1,11 +1,12 @@
-import wave
 import numpy
 import pyaudio
+from . import BaseThread
 
 
-class InputConsumer(object):
+class InputConsumer(BaseThread):
 
     def __init__(self, **kwargs):
+        super().__init__()
         self.rate = kwargs.pop("rate")
         self.frames_per_buffer = kwargs.pop("frames_per_buffer")
         self.channels = 1  # kwargs.pop("channels")

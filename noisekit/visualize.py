@@ -1,4 +1,3 @@
-import signal
 import shutil
 import audioop
 import numpy
@@ -6,7 +5,7 @@ import numpy
 from termcolor import colored
 from . import levels, config
 from .logging import get_logger
-from .audio import InputConsumer
+from .audio.input import InputConsumer
 
 
 class Visualizer(InputConsumer):
@@ -33,14 +32,6 @@ class Visualizer(InputConsumer):
             "peak": kwargs.pop("peak_symbol")
         }
         self.record_to = kwargs.pop("record")  # todo
-        self.is_alive = None
-
-    def stop(self, *args):
-        self.is_alive = False
-
-    def register_signals(self):
-        signal.signal(signal.SIGINT, self.stop)
-        signal.signal(signal.SIGTERM, self.stop)
 
     def get_level(self, rms):
         for level in (levels.HIGH, levels.MEDIUM, levels.LOW):
@@ -49,7 +40,6 @@ class Visualizer(InputConsumer):
         return levels.QUIET
 
     def run(self):
-        self.register_signals()
 
         self.logger.debug("Thresholds ~ {LOW}: %(LOW)i, {MEDIUM}: %(MEDIUM)i, {HIGH}: %(HIGH)s (RMS)".format(
             **{k: colored(k, v) for k, v in iter(self.colors.items())}), **self.thresholds)
@@ -66,11 +56,9 @@ class Visualizer(InputConsumer):
         max_value_length = max((len(str(max_frequency)), len(str(max_amplitude))))
         info_template = "{{frequency:{0}d}} Hz ~ RMS {{amplitude:<{0}d}}".format(max_value_length)
 
-        self.is_alive = True
-
         last_frequency = 0
 
-        while self.is_alive:
+        while not self.shutdown_flag.is_set():
 
             context = {}
             samples = self.read(self.frames_per_buffer)
