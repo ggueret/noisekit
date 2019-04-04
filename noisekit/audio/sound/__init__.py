@@ -48,9 +48,9 @@ class SoundTone(Sound):
     def generate(self, f):
         self.logger.debug("generating %s into memory...", self)
         func_start = time.time()
-        channels = ((WAVE_GENERATORS[self.waveform](self.frequency, self.rate, self.amplitude),) for i in range(1))
+        channels = ((WAVE_GENERATORS[self.waveform](self.frequency, self.rate, self.amplitude),),)
         samples = compute_samples(channels, self.rate * self.duration)
-        write_wavefile(f, samples)
+        write_wavefile(f, samples, nchannels=1)
         self.logger.debug("%s generated in %.2f seconds.", self, time.time() - func_start)
 
     def __str__(self):
