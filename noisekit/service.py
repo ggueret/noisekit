@@ -18,7 +18,11 @@ class Service(object):
 
         self.thread.start()
 
-        while self.is_alive and self.thread.is_alive():
+        while self.is_alive:
+
+            if not self.thread.is_alive():
+                return  # PEP 479
+
             time.sleep(latency)
 
         self.thread.shutdown_flag.set()
