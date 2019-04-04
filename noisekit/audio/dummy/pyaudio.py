@@ -1,3 +1,7 @@
+"""
+Dummy audio classes, used on MacOS Mojave before the patching of portaudio.
+https://github.com/ggueret/portaudio
+"""
 import itertools
 import struct
 from ..utils import noise_maker, compute_samples, sine_wave, grouper
