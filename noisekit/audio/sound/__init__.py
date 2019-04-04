@@ -24,6 +24,7 @@ class SoundFile(Sound):
         super().__init__()
         self.logger.info("opening Sound file from %s...", path)
         self.fd = open(path, "rb")
+        self.path = path
 
     def __str__(self):
         return f"SoundFile({self.path})"
