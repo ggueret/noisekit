@@ -31,8 +31,8 @@ class SoundFile(Sound):
 
 class SoundTone(Sound):
 
-    def __init__(self, amplitude=None, duration=None, frequency=None, rate=None, waveform=None):
-        super().__init__()
+    def __init__(self, fd=None, amplitude=None, duration=None, frequency=None, rate=None, waveform=None):
+        super().__init__(fd)
 
         self.amplitude = amplitude or 0.5
         self.duration = duration or 3
@@ -40,7 +40,9 @@ class SoundTone(Sound):
         self.rate = rate or 44100
         self.waveform = waveform or "sine"
 
-        self.fd = io.BytesIO()  # tones are generated on start and simply keeped into memory
+        if not self.fd:
+            self.fd = io.BytesIO()
+
         self.generate(self.fd)
 
     def generate(self, f):

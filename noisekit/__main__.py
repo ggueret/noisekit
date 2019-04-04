@@ -75,22 +75,20 @@ def register_audio_input_args(subparser):
     subparser.add_argument("-no", "--no-overflow", action="store_true", default=False)
 
 
-#def register_generate(subparser):
-#    # todo: disabled for now, to review.
-#
-#    def run(args):
-#        from . import generate
-#        channels = ((generate.square_wave(args.frequency, 44100, args.amplitude),) for i in range(1))
-#        samples = generate.compute_samples(channels, 44100 * args.duration)
-#        generate.write_wavefile(args.output, samples, 44100 * args.duration, 2, 16 // 8, 44100)
-#
-#    subparser.set_defaults(func=run)
-#    subparser.add_argument("--frequency", default="10", help="frequency in hertz")
-#    subparser.add_argument("--waveform", default="sine", choices=WAVE_GENERATORS.values())
-#    subparser.add_argument("--duration", default=1, type=int, help="duration in seconds")
-#    subparser.add_argument("--amplitude", default=50, type=amplitude_as_percentage, metavar="[0-100]", help="amplitude as a percentage")
-#    subparser.add_argument("--output", default="output.wav", help="output file")
-#    subparser.add_argument("--output", type=argparse.FileType('w'), default=sys.stdout)
+def register_generate(subparser):
+
+    def run(args):
+        from .audio.sound import SoundTone
+        SoundTone(fd=args.output, amplitude=args.amplitude, duration=args.duration, frequency=args.frequency, rate=args.rate, waveform=args.waveform)
+        args.output.close()
+
+    subparser.set_defaults(func=run)
+    subparser.add_argument("--amplitude", default=75, type=amplitude_as_percentage, metavar="[0-100]", help="amplitude as a percentage")
+    subparser.add_argument("--duration", default=3, type=int, help="duration in seconds")
+    subparser.add_argument("--frequency", default="90", help="frequency in hertz")
+    subparser.add_argument("--rate", default=44100, type=int, help="frame rate")
+    subparser.add_argument("--waveform", default="sine", choices=WAVE_GENERATORS.keys())
+    subparser.add_argument("output", type=argparse.FileType('wb'), default=sys.stdout, help="destination file")
 
 
 def register_visualize(subparser):
@@ -201,6 +199,7 @@ def parse_args():
         description=__DESCRIPTION__
     )
     subparsers = parser.add_subparsers(dest="command", help="commands")
+    register_generate(subparsers.add_parser("generate"))
     register_visualize(subparsers.add_parser("visualize"))
     register_mitigate(subparsers.add_parser("mitigate"))
 
