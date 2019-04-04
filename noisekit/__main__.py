@@ -44,7 +44,7 @@ def amplitude_as_percentage(raw_args):
     if value > 100:
         raise argparse.ArgumentTypeError("maximum percentage is 100.")
     elif value < 0:
-        argparse.ArgumentTypeError("minimum percentage is 0.")
+        raise argparse.ArgumentTypeError("minimum percentage is 0.")
 
     return value / 100
 
@@ -61,11 +61,12 @@ def register_audio_input_args(subparser):
     subparser.add_argument("-f", "--frames-per-buffer", default=config.FRAMES_PER_BUFFER, type=type(config.FRAMES_PER_BUFFER))
     subparser.add_argument("-r", "--rate", default=config.RATE, type=type(config.RATE))
 #    subparser.add_argument("--channels", default=config.CHANNELS, type=type(config.CHANNELS))
-    subparser.add_argument("--format", default=config.FORMAT, choices=["Float32", "Int32", "Int24", "Int16", "UInt8"], help="PyAudio format type")
+    subparser.add_argument("--format", dest="sample_format", default=config.SAMPLE_FORMAT, choices=["Float32", "Int32", "Int24", "Int16", "UInt8"], help="PyAudio format type")
     subparser.add_argument("-no", "--no-overflow", action="store_true", default=False)
 
 
 def register_generate(subparser):
+    # todo: disabled for now, to review.
 
     def run(args):
         from . import generate
@@ -83,11 +84,9 @@ def register_generate(subparser):
 
 
 def register_visualize(subparser):
-
     def run(args):
         from .visualize import Visualizer
-        visualizer = Visualizer(**vars(args))
-        service = Service(visualizer)
+        service = Service(Visualizer, load_settings(args))
         service.run()
 
     subparser.set_defaults(func=run)
@@ -114,8 +113,7 @@ def register_mitigate(subparser):
 
     def run(args):
         from .mitigate import Mitigator
-        mitigator = Mitigator(**load_settings(args))
-        service = Service(mitigator)
+        service = Service(Mitigator, load_settings(args))
         service.run()
 
     subparser.set_defaults(func=run)
@@ -197,7 +195,7 @@ def parse_args():
     parser.add_argument("--loglevel", choices=["debug", "info", "warning", "error", "critical"], default="info")
     subparsers = parser.add_subparsers(dest="command", help="commands")
 
-    register_generate(subparsers.add_parser("generate"))
+#    register_generate(subparsers.add_parser("generate"))
     register_visualize(subparsers.add_parser("visualize"))
     register_mitigate(subparsers.add_parser("mitigate"))
 

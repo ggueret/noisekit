@@ -23,38 +23,39 @@ class Mitigator(InputConsumer):
         "random": ChoiceIterator
     }
 
-    def __init__(self, **kwargs):
-        super(Mitigator, self).__init__(**kwargs)
+    def __init__(self, service, settings, *args, **kwargs):
+        super(Mitigator, self).__init__(service, settings, *args, **kwargs)
         # todo: must handle the case where noisekit must exit from there
-        self.producer = OutputProducer(player=kwargs.pop("player"), beat_every=kwargs.pop("beat_every"), beat_sound=kwargs.pop("beat_sound"))
+
+        self.producer = OutputProducer(self.service, self.settings)
         self.logger = get_logger(__name__)
 
         self.thresholds = {
-            levels.LOW: kwargs.pop("low_threshold"),
-            levels.MEDIUM: kwargs.pop("medium_threshold"),
-            levels.HIGH: kwargs.pop("high_threshold")
+            levels.LOW: settings["low_threshold"],
+            levels.MEDIUM: settings["medium_threshold"],
+            levels.HIGH: self.settings["high_threshold"]
         }
 
         self.sounds = {}
-        picker = self.PICKERS[kwargs.pop("picking_mode")]
+        picker = self.PICKERS[settings.get("picking_mode")]
 
         for level in (levels.LOW, levels.MEDIUM, levels.HIGH):
             sounds = []
 
-            for sound_path in kwargs.pop("{}_sounds".format(level.lower()), []):
+            for sound_path in settings.get("{}_sounds".format(level.lower()), []):
                 sounds.append(SoundFile(sound_path))
 
             if not sounds:
                 sounds.append(SoundTone(
-                    frequency=kwargs.pop("{}_frequency".format(level.lower())),
-                    amplitude=0.5
+                    frequency=settings["{}_frequency".format(level.lower())],
+                    amplitude=0.5,
                 ))
 
             self.sounds[level] = picker(sounds)
 
-        self.record_to = kwargs.pop("record")  # todo
+        self.record_to = self.settings["record"]  # todo
         self.is_quiet = None
-        self.is_psycho = kwargs.pop("psycho_mode")
+        self.is_psycho = self.settings["psycho_mode"]
         self.last_block_playing = False
 
     def get_level(self, rms):
@@ -74,7 +75,7 @@ class Mitigator(InputConsumer):
             context = {}
             context["state"] = states.PLAYING if self.producer.is_active.is_set() else states.LISTENING
 
-            samples = self.read(self.frames_per_buffer)
+            samples = self.read(self.settings["frames_per_buffer"])
 
             if context["state"] == states.PLAYING and not self.is_psycho:
                 self.last_block_playing = True

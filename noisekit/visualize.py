@@ -10,28 +10,25 @@ from .audio.input import InputConsumer
 
 class Visualizer(InputConsumer):
 
-    def __init__(self, **kwargs):
-        super(Visualizer, self).__init__(**kwargs)
+    def __init__(self, service, settings, *args, **kwargs):
+        super(Visualizer, self).__init__(service, settings, *args, **kwargs)
 
-        self.logger = get_logger(__name__)
-        self.sensitivity = kwargs.pop("sensitivity")
         self.colors = {
-            levels.QUIET: kwargs.pop("quiet_color"),
-            levels.LOW: kwargs.pop("low_color"),
-            levels.MEDIUM: kwargs.pop("medium_color"),
-            levels.HIGH: kwargs.pop("high_color")
+            levels.QUIET: settings["quiet_color"],
+            levels.LOW: settings["low_color"],
+            levels.MEDIUM: settings["medium_color"],
+            levels.HIGH: settings["high_color"]
         }
         self.thresholds = {
-            levels.LOW: kwargs.pop("low_threshold", self.rate + 1),
-            levels.MEDIUM: kwargs.pop("medium_threshold", self.rate + 1),
-            levels.HIGH: kwargs.pop("high_threshold", self.rate + 1)
+            levels.LOW: settings.get("low_threshold", self.settings["rate"] + 1),
+            levels.MEDIUM: settings.get("medium_threshold", self.settings["rate"] + 1),
+            levels.HIGH: settings.get("high_threshold", self.settings["rate"] + 1)
         }
         self.symbols = {
-            "amplitude": kwargs.pop("amplitude_symbol"),
-            "frequency": kwargs.pop("frequency_symbol"),
-            "peak": kwargs.pop("peak_symbol")
+            "amplitude": settings["amplitude_symbol"],
+            "frequency": settings["frequency_symbol"],
+            "peak": settings["peak_symbol"]
         }
-        self.record_to = kwargs.pop("record")  # todo
 
     def get_level(self, rms):
         for level in (levels.HIGH, levels.MEDIUM, levels.LOW):
@@ -44,13 +41,13 @@ class Visualizer(InputConsumer):
         self.logger.debug("Thresholds ~ {LOW}: %(LOW)i, {MEDIUM}: %(MEDIUM)i, {HIGH}: %(HIGH)s (RMS)".format(
             **{k: colored(k, v) for k, v in iter(self.colors.items())}), **self.thresholds)
 
-        max_amplitude = numpy.iinfo(self.sample_format).max / self.sensitivity
+        max_amplitude = numpy.iinfo(self.settings["sample_format"]).max / self.settings["sensitivity"]
         self.logger.debug("Max amplitude ~ {} RMS".format(max_amplitude))
 
-        max_frequency = self.rate
+        max_frequency = self.settings["rate"]
         self.logger.debug("Max frequency ~ {} RMS".format(max_frequency))
 
-        chunk_length = int((self.frames_per_buffer / self.rate) * 1000)
+        chunk_length = int((self.settings["frames_per_buffer"] / self.settings["rate"]) * 1000)
         self.logger.debug("Line duration ~ {:.2f} ms", chunk_length)
 
         max_value_length = max((len(str(max_frequency)), len(str(max_amplitude))))
@@ -61,7 +58,7 @@ class Visualizer(InputConsumer):
         while not self.shutdown_flag.is_set():
 
             context = {}
-            samples = self.read(self.frames_per_buffer)
+            samples = self.read(self.settings["frames_per_buffer"])
 
             context["amplitude"] = audioop.rms(samples, self.audio.get_sample_size(self.format_type))
             context["frequency"] = self.get_frequency(samples)

@@ -5,10 +5,11 @@ from .logging import get_logger
 
 class Service(object):
 
-    def __init__(self, thread):
-        self.thread = thread
-        self.is_alive = None
+    def __init__(self, thread_obj, settings):
+        self.cache = None
+        self.thread = thread_obj(self, settings)
         self.logger = get_logger(__name__)
+        self.is_alive = None
 
     def run(self, latency=0.01):
         self.register_signals()
@@ -19,7 +20,6 @@ class Service(object):
         while self.is_alive:
             time.sleep(latency)
 
-        self.logger.info("waiting for related thread(s) to finish...")
         self.thread.shutdown_flag.set()
         self.thread.join()
 
