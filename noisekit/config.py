@@ -11,7 +11,7 @@ SENSITIVITY = 1
 FRAMES_PER_BUFFER = 1024
 RATE = 44100
 CHANNELS = 1
-FORMAT = "Int16"
+SAMPLE_FORMAT = "Int16"
 PICKING_MODE = "cycle"
 
 if platform.system() == "Darwin":

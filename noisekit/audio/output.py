@@ -1,4 +1,3 @@
-import os
 import time
 import queue
 import shlex
@@ -21,11 +20,6 @@ class OutputProducer(BaseThread):
         self.beat_sound = SoundFile(settings.get("beat_sound"))
         self.player_command = shlex.split(settings.get("player"))
 
-    def clean_old_cached_sounds(self, cache_dir, max_size):
-        for name in os.listdir(cache_dir):
-            file_path = os.path.join(cache_dir, name)
-            print(file_path, os.path.getsize(file_path))
-
     def enqueue(self, sound):
         self.queue.put_nowait(sound)
 
@@ -37,9 +31,8 @@ class OutputProducer(BaseThread):
         # todo: propagate if a FileNotFoundError is raised for eg. a misconfigured player
         process = subprocess.Popen(self.player_command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
 
-        for chunk in sound.read_chunks():
+        for chunk in sound.read(1024):
             process.stdin.write(chunk)
-#            process.stdin.flush()
 
         process.communicate()
         process.stdin.close()

@@ -6,7 +6,6 @@ from .logging import get_logger
 class Service(object):
 
     def __init__(self, thread_obj, settings):
-        self.cache = None
         self.thread = thread_obj(self, settings)
         self.logger = get_logger(__name__)
         self.is_alive = None

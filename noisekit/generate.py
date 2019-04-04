@@ -26,9 +26,9 @@ def sine_wave(frequency=440, framerate=44100, amplitude=0.5, skip_frame=0):
 
     for i in count(skip_frame):
 #        sine = math.sin(2.0 * math.pi * float(frequency) * (float(i) / float(framerate)))
+#        yield amplitude * sinusoid
         sine = numpy.sin(2 * numpy.pi * float(frequency) * (float(i) / float(framerate)))
         yield float(amplitude) * sine
-#        yield amplitude * sinusoid
 
 
 def square_wave(frequency=440.0, framerate=44100, amplitude=0.5):
