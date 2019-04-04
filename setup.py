@@ -24,7 +24,7 @@ setup(
         }
     },
     classifiers=[
-        "Development Status :: 5 - Production/Stable",
+        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Framework :: Pelican",
         "License :: OSI Approved :: MIT License",
