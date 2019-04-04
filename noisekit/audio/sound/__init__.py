@@ -1,7 +1,7 @@
 import io
 import time
 
-from ...logging import get_logger
+import logging
 from ...utils import chunked_read
 from .wave import compute_samples, write_wavefile
 from .wave import GENERATORS as WAVE_GENERATORS
@@ -11,7 +11,7 @@ class Sound(object):
 
     def __init__(self, fd=None):
         self.fd = fd
-        self.logger = get_logger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
     def read(self, size=None):
         self.fd.seek(0)

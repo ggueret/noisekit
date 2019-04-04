@@ -1,14 +1,9 @@
-import os
 import time
-import signal
-
 import audioop
-import tempfile
-import subprocess
+import logging
 
 from itertools import cycle
 from . import levels, states
-from .logging import get_logger
 from .audio.input import InputConsumer
 from .audio.output import OutputProducer
 from .audio.sound import SoundFile, SoundTone
@@ -27,7 +22,7 @@ class Mitigator(InputConsumer):
         # todo: must handle the case where noisekit must exit from there
 
         self.producer = OutputProducer(self.service, self.settings)
-        self.logger = get_logger(__name__)
+        self.logger = logging.getLogger(__name__)
 
         self.thresholds = {
             levels.LOW: settings["low_threshold"],
@@ -67,8 +62,7 @@ class Mitigator(InputConsumer):
 
         self.producer.start()
 
-        self.logger.info(f"thresholds: low[{self.thresholds['LOW']}] medium[{self.thresholds['MEDIUM']}] high[{self.thresholds['HIGH']}]")
-
+        self.logger.info("thresholds: low[%(LOW)i] medium[%(MEDIUM)i] high[%(HIGH)i]", self.thresholds)
         while not self.shutdown_flag.is_set():
 
             context = {}
@@ -94,7 +88,7 @@ class Mitigator(InputConsumer):
                 context["staged"] = next(self.sounds[context["level"]])
 
             if context["staged"]:
-                self.logger.info(f"{context['level']} level reached with {context['amplitude']} RMS @ {context['frequency']} Hz. Playing: '{context['staged']}'.")
+                self.logger.info("%(level)s level reached with %(amplitude)i RMS @ %(frequency)i Hz. Playing: %(staged)s.", context)
                 self.producer.enqueue(context["staged"])
 
             context["timestamp"] = time.time()

@@ -1,14 +1,14 @@
 import time
 import signal
+import logging
 import threading
-from .logging import get_logger
 
 
 class Service(object):
 
     def __init__(self, thread_obj, settings):
         self.thread = thread_obj(self, settings)
-        self.logger = get_logger(__name__)
+        self.logger = logging.getLogger(__name__)
         self.is_alive = None
 
     def run(self, latency=0.01):
@@ -35,7 +35,7 @@ class BaseThread(threading.Thread):
     """A thread is spawned by the `Service`, who pass his settings and thread-safe cache"""
     def __init__(self, service, settings):
         super().__init__()
-        self.logger = get_logger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.service = service
         self.settings = settings
         self.shutdown_flag = threading.Event()

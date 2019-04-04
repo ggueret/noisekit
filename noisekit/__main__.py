@@ -7,11 +7,20 @@ import json
 import argparse
 import logging
 
-from .logging import setup_logging
-from .service import Service
 from . import config
 from . import __DESCRIPTION__, __VERSION__
+from .service import Service
 from .audio.sound import WAVE_GENERATORS
+
+
+def setup_logging(level):
+    format_tpl = "[%(levelname)s] %(name)s ~ %(message)s"
+
+    # in runned by systemd, there is no reason to display datetime to syslog
+    if os.getppid() != 1:
+        format_tpl = "%(asctime)s " + format_tpl
+
+    logging.basicConfig(level=level, format=format_tpl, datefmt="%Y-%m-%d %H:%M:%S")
 
 
 def load_settings(args):
@@ -207,6 +216,7 @@ def main():
     args = parse_args()
     if not args.command:
         return
+
     setup_logging(getattr(logging, args.loglevel.upper()))
     logging.info("[~] starting %s module of noisekit v%s", args.command, __VERSION__)
 
