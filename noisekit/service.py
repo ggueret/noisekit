@@ -5,6 +5,7 @@ import threading
 
 
 class Service(object):
+    """Service act as a main thread"""
 
     def __init__(self, thread_obj, settings):
         self.thread = thread_obj(self, settings)
@@ -17,7 +18,7 @@ class Service(object):
 
         self.thread.start()
 
-        while self.is_alive:
+        while self.is_alive and self.thread.is_alive():
             time.sleep(latency)
 
         self.thread.shutdown_flag.set()
@@ -32,7 +33,8 @@ class Service(object):
 
 
 class BaseThread(threading.Thread):
-    """A thread is spawned by the `Service`, who pass his settings and thread-safe cache"""
+    """A thread is spawned by the `Service`, who pass himself with is settings"""
+
     def __init__(self, service, settings):
         super().__init__()
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")

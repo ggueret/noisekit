@@ -63,8 +63,8 @@ class Mitigator(InputConsumer):
         self.producer.start()
 
         self.logger.info("thresholds: low[%(LOW)i] medium[%(MEDIUM)i] high[%(HIGH)i]", self.thresholds)
-        while not self.shutdown_flag.is_set():
 
+        while not self.shutdown_flag.is_set() and self.producer.is_alive():
             context = {}
             context["state"] = states.PLAYING if self.producer.is_active.is_set() else states.LISTENING
 
