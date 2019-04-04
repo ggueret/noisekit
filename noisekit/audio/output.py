@@ -3,8 +3,8 @@ import queue
 import shlex
 import threading
 import subprocess
-from . import BaseThread
 from .sound import SoundFile
+from ..service import BaseThread
 
 
 class OutputProducer(BaseThread):

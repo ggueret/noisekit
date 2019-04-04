@@ -1,4 +1,6 @@
-# code forked from zacharydenton/wavebender
+"""
+plugged numpy to zacharydenton/wavebender
+"""
 import math
 import wave
 import numpy
@@ -12,21 +14,18 @@ def noise_maker(samples, framerate=44100.0, volume=32767.0):
 
 
 def grouper(n, iterable, fillvalue=None):
-    "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
     args = [iter(iterable)] * n
     return zip_longest(fillvalue=fillvalue, *args)
 
 
 def sine_wave(frequency=440, framerate=44100, amplitude=0.5, skip_frame=0):
-    # https://dsp.stackexchange.com/questions/25119/generating-a-noisy-sine-wave-in-python-efficiently
     if amplitude > 1.0:
         amplitude = 1.0
+
     elif amplitude < 0.0:
         amplitude = 0.0
 
     for i in count(skip_frame):
-#        sine = math.sin(2.0 * math.pi * float(frequency) * (float(i) / float(framerate)))
-#        yield amplitude * sinusoid
         sine = numpy.sin(2 * numpy.pi * float(frequency) * (float(i) / float(framerate)))
         yield float(amplitude) * sine
 
@@ -67,7 +66,6 @@ def write_wavefile(f, samples, nframes=None, nchannels=2, sampwidth=2, framerate
 
     max_amplitude = float(int((2 ** (sampwidth * 8)) / 2) - 1)
 
-    # split the samples into chunks (to reduce memory consumption and improve performance)
     for chunk in grouper(bufsize, samples):
         frames = b''.join(b''.join(struct.pack('h', int(max_amplitude * sample)) for sample in channels) for channels in chunk if channels is not None)
         w.writeframesraw(frames)
@@ -75,12 +73,9 @@ def write_wavefile(f, samples, nframes=None, nchannels=2, sampwidth=2, framerate
     w.close()
 
 
-def write_pcm(f, samples, sampwidth=2, framerate=44100, bufsize=2048):
-    max_amplitude = float(int((2 ** (sampwidth * 8)) / 2) - 1)
-
-    # split the samples into chunks (to reduce memory consumption and improve performance)
-    for chunk in grouper(bufsize, samples):
-        frames = b''.join(b''.join(struct.pack('h', int(max_amplitude * sample)) for sample in channels) for channels in chunk if channels is not None)
-        f.write(frames)
-
-    f.close()
+GENERATORS = {
+    "sine": sine_wave,
+    "white": white_noise,
+    "damped": damped_wave,
+    "square": square_wave
+}

@@ -1,6 +1,6 @@
 import numpy
 import pyaudio
-from . import BaseThread
+from ..service import BaseThread
 
 
 class InputConsumer(BaseThread):

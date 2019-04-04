@@ -11,6 +11,7 @@ from .logging import setup_logging
 from .service import Service
 from . import config
 from . import __DESCRIPTION__, __VERSION__
+from .audio.sound import WAVE_GENERATORS
 
 
 def load_settings(args):
@@ -65,21 +66,21 @@ def register_audio_input_args(subparser):
     subparser.add_argument("-no", "--no-overflow", action="store_true", default=False)
 
 
-def register_generate(subparser):
-    # todo: disabled for now, to review.
-
-    def run(args):
-        from . import generate
-        channels = ((generate.square_wave(args.frequency, 44100, args.amplitude),) for i in range(1))
-        samples = generate.compute_samples(channels, 44100 * args.duration)
-        generate.write_wavefile(args.output, samples, 44100 * args.duration, 2, 16 // 8, 44100)
-
-    subparser.set_defaults(func=run)
-    subparser.add_argument("--frequency", default="10", help="frequency in hertz")
-    subparser.add_argument("--waveform", default="sine", choices=["sine", "square"])
-    subparser.add_argument("--duration", default=1, type=int, help="duration in seconds")
-    subparser.add_argument("--amplitude", default=50, type=amplitude_as_percentage, metavar="[0-100]", help="amplitude as a percentage")
-    subparser.add_argument("--output", default="output.wav", help="output file")
+#def register_generate(subparser):
+#    # todo: disabled for now, to review.
+#
+#    def run(args):
+#        from . import generate
+#        channels = ((generate.square_wave(args.frequency, 44100, args.amplitude),) for i in range(1))
+#        samples = generate.compute_samples(channels, 44100 * args.duration)
+#        generate.write_wavefile(args.output, samples, 44100 * args.duration, 2, 16 // 8, 44100)
+#
+#    subparser.set_defaults(func=run)
+#    subparser.add_argument("--frequency", default="10", help="frequency in hertz")
+#    subparser.add_argument("--waveform", default="sine", choices=WAVE_GENERATORS.values())
+#    subparser.add_argument("--duration", default=1, type=int, help="duration in seconds")
+#    subparser.add_argument("--amplitude", default=50, type=amplitude_as_percentage, metavar="[0-100]", help="amplitude as a percentage")
+#    subparser.add_argument("--output", default="output.wav", help="output file")
 #    subparser.add_argument("--output", type=argparse.FileType('w'), default=sys.stdout)
 
 

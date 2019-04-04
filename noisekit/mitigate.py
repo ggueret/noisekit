@@ -13,7 +13,6 @@ from .audio.input import InputConsumer
 from .audio.output import OutputProducer
 from .audio.sound import SoundFile, SoundTone
 from .utils import ChoiceIterator
-from . import generate
 
 
 class Mitigator(InputConsumer):
