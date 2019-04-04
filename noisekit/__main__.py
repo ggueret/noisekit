@@ -128,7 +128,6 @@ def register_mitigate(subparser):
 
     subparser.set_defaults(func=run)
     register_audio_input_args(subparser)
-    subparser.add_argument("-c", "--config", type=argparse.FileType("rb"))
 
     subparser.add_argument("-R", "--record", type=argparse.FileType("wb"))
     subparser.add_argument("-q", "--quiet", action="store_true", default=False)
@@ -201,14 +200,13 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=__DESCRIPTION__
     )
-    parser.add_argument("--version", action="version", version="%(prog)s {}".format(__name__))
-    parser.add_argument("--loglevel", choices=["debug", "info", "warning", "error", "critical"], default="info")
     subparsers = parser.add_subparsers(dest="command", help="commands")
-
-#    register_generate(subparsers.add_parser("generate"))
     register_visualize(subparsers.add_parser("visualize"))
     register_mitigate(subparsers.add_parser("mitigate"))
 
+    parser.add_argument("--version", action="version", version="%(prog)s {}".format(__name__))
+    parser.add_argument("--loglevel", choices=["debug", "info", "warning", "error", "critical"], default="info")
+    parser.add_argument("-c", "--config", type=argparse.FileType("rb"))
     return parser.parse_args()
 
 

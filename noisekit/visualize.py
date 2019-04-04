@@ -38,7 +38,7 @@ class Visualizer(InputConsumer):
     def run(self):
 
         print("Thresholds ~ {LOW}: %(LOW)i, {MEDIUM}: %(MEDIUM)i, {HIGH}: %(HIGH)s (RMS)".format(
-            **{k: colored(k, v) for k, v in iter(self.colors.items())}), **self.thresholds)
+            **{k: colored(k, v) for k, v in iter(self.colors.items())}) % self.thresholds)
 
         max_amplitude = numpy.iinfo(self.settings["sample_format"]).max / self.settings["sensitivity"]
         print("Max amplitude ~ {} RMS".format(max_amplitude))
@@ -47,7 +47,7 @@ class Visualizer(InputConsumer):
         print("Max frequency ~ {} RMS".format(max_frequency))
 
         chunk_length = int((self.settings["frames_per_buffer"] / self.settings["rate"]) * 1000)
-        print("Line duration ~ {:.2f} ms", chunk_length)
+        print("Line duration ~ {:.2f} ms".format(chunk_length))
 
         max_value_length = max((len(str(max_frequency)), len(str(max_amplitude))))
         info_template = "{{frequency:{0}d}} Hz ~ RMS {{amplitude:<{0}d}}".format(max_value_length)
