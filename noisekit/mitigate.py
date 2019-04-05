@@ -93,6 +93,7 @@ class Mitigator(InputConsumer):
             if context["staged"]:
                 self.logger.info("%(level)s level reached with %(amplitude)i RMS @ %(frequency)i Hz. Playing: %(staged)s.", context)
                 self.producer.enqueue((context["timestamp"], context["staged"]))
+                self.skip_next_block = True
 
         self.producer.shutdown_flag.set()
         self.producer.join()

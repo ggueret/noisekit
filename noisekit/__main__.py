@@ -176,7 +176,7 @@ def register_mitigate(subparser):
     subparser.add_argument("--player", default=DEFAULT_PLAYER, help="Path to the player executable. Sounds paths are passed as an argument.")
 
     subparser.add_argument("-be", "--beat-every", type=int, help="Play the '--beat-sound' at a fixed interval. 0 on default, which disable the beat.")
-    subparser.add_argument("-rl", "--reply-latency", default=0, type=int, help="seconds to wait before playing a triggered reply sound.")
+    subparser.add_argument("-rl", "--reply-latency", default=0, type=float, help="seconds to wait before playing a triggered reply sound.")
     subparser.add_argument("--reply-window", type=int, help="minimum interval between two replies, in seconds.")
 #    subparser.add_argument("--quiet-hours", default=None, type=valid_int_range, help="quiet hours in which no replies will be triggered.")
 

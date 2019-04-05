@@ -29,13 +29,10 @@ class OutputProducer(BaseThread):
     def enqueue(self, sound):
         self.queue.put_nowait(sound)
 
-    def play(self, sound, enqueued_at):
+    def play(self, sound, latency=0):
         self.is_active.set()
-
-        elapsed_seconds = int(time.time() - enqueued_at)
-
         # apply some latency if needed.
-        time.sleep(self.settings["reply_latency"] - elapsed_seconds)
+        time.sleep(latency)
 
         self.last_active = time.time()
         process = subprocess.Popen(self.player_command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
@@ -60,12 +57,12 @@ class OutputProducer(BaseThread):
 
                 if self.settings["beat_every"] and self.beat_sound and time.time() - self.last_active >= self.settings["beat_every"]:
                     self.logger.info("beating with %s.", self.beat_sound)
-                    self.play(self.beat_sound)
+                    self.play(self.beat_sound, latency=0)
 
                 continue
 
             enqueued_at, sound = sound_job
-            self.play(sound, enqueued_at)
+            self.play(sound, latency=max(0, self.settings["reply_latency"] - time.time() - enqueued_at))
             self.queue.task_done()
 
         self.logger.debug("stopped the output producer.")
