@@ -43,6 +43,7 @@ def square_wave(frequency=440.0, framerate=44100, amplitude=0.5):
 def damped_wave(frequency=440.0, framerate=44100, amplitude=0.5, length=44100):
     if amplitude > 1.0:
         amplitude = 1.0
+
     elif amplitude < 0.0:
         amplitude = 0.0
 
@@ -75,7 +76,6 @@ def write_wavefile(f, samples, nframes=None, nchannels=2, sampwidth=2, framerate
 
 GENERATORS = {
     "sine": sine_wave,
-    "white": white_noise,
     "damped": damped_wave,
     "square": square_wave
 }
