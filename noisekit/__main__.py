@@ -3,41 +3,39 @@
 from __future__ import absolute_import
 import re
 import os
-import sys
 import json
+import platform
 import argparse
 import logging
 
-from . import config
 from . import __DESCRIPTION__, __VERSION__
 from .service import Service
 from .audio.sound import WAVE_GENERATORS
 
 
 def setup_logging(level):
+    level_value = getattr(logging, level.upper())
     format_tpl = "[%(levelname)s] ~ %(message)s"
 
     # in runned by systemd, there is no reason to display datetime to syslog
     if os.getppid() != 1:
         format_tpl = "%(asctime)s " + format_tpl
 
-    logging.basicConfig(level=level, format=format_tpl, datefmt="%Y-%m-%d %H:%M:%S")
+    logging.basicConfig(level=level_value, format=format_tpl, datefmt="%Y-%m-%d %H:%M:%S")
 
 
 def load_settings(args):
-    """Load settings using in order: envion > argv > config > default"""
+    """Load settings using in order: config > envion > argv"""
     merged_config = {}
     file_config = json.load(args.config) if args.config else {}
     del args.config, args.func
 
     for arg in vars(args):
-        default_value = getattr(config, arg.upper())
-
-        from_environ = os.environ.get("NOISEKIT_{}")
-        from_argv = getattr(args, arg) if getattr(args, arg) is not default_value else None
         from_config = file_config.get(arg)
+        from_environ = os.environ.get("NOISEKIT_{}")
+        from_argv = getattr(args, arg)
 
-        merged_config[arg] = from_environ or from_argv or from_config or default_value
+        merged_config[arg] = from_config or from_environ or from_argv
 
     return merged_config
 
@@ -77,10 +75,21 @@ def soundtone_type(value):
     return parameters
 
 
-def valid_int_range(value):
-    start, end = value.split("-", 1)
-    return int(start), int(end)
+def int_range(min_val, max_val):
+    def validator(value):
+        value = int(value)
+        if value < min_val:
+            raise argparse.ArgumentTypeError(f"value is below the min ({value} < {min_val})")
+        elif value > max_val:
+            raise argparse.ArgumentTypeError(f"value is above the max ({value} > {min_val})")
 
+        return value
+
+    return validator
+
+#def valid_int_range(value):
+#    start, end = value.split("-", 1)
+#    return int(start), int(end)
 
 def amplitude_as_percentage(raw_args):
     value = int(raw_args)
@@ -93,10 +102,10 @@ def amplitude_as_percentage(raw_args):
 
 
 def register_audio_input_args(subparser):
-    subparser.add_argument("-f", "--frames-per-buffer", default=config.FRAMES_PER_BUFFER, type=type(config.FRAMES_PER_BUFFER))
-    subparser.add_argument("-r", "--rate", default=config.RATE, type=int)
-#    subparser.add_argument("--channels", default=config.CHANNELS, type=type(config.CHANNELS))
-    subparser.add_argument("--format", dest="sample_format", default=config.SAMPLE_FORMAT, choices=["Float32", "Int32", "Int24", "Int16", "UInt8"], help="PyAudio format type")
+    subparser.add_argument("-f", "--frames-per-buffer", default=1024, type=int)
+    subparser.add_argument("-r", "--rate", default=44100, type=int)
+#    subparser.add_argument("--channels", default=1, type=int_range(0, 1))
+    subparser.add_argument("--format", dest="sample_format", default="Int16", choices=["Float32", "Int32", "Int24", "Int16", "UInt8"], help="PyAudio format type")
     subparser.add_argument("-no", "--no-overflow", action="store_true", default=False)
 
 
@@ -125,22 +134,22 @@ def register_visualize(subparser):
 
     subparser.set_defaults(func=run)
     register_audio_input_args(subparser)
-    subparser.add_argument("-s", "--sensitivity", default=config.SENSITIVITY, type=type(config.SENSITIVITY), help="amplitude sensitivity multiplier")
+    subparser.add_argument("-s", "--sensitivity", default=1, type=int, help="amplitude sensitivity multiplier")
 
     subparser.add_argument("-R", "--record", type=argparse.FileType("wb"))
 
-    subparser.add_argument("-as", "--amplitude-symbol", default=config.AMPLITUDE_SYMBOL)
-    subparser.add_argument("-fs", "--frequency-symbol", default=config.FREQUENCY_SYMBOL)
-    subparser.add_argument("-ps", "--peak-symbol", default=config.PEAK_SYMBOL)
+    subparser.add_argument("-as", "--amplitude-symbol", default="=")
+    subparser.add_argument("-fs", "--frequency-symbol", default="-")
+    subparser.add_argument("-ps", "--peak-symbol", default="|")
 
-    subparser.add_argument("-lt", "--low", dest="low_threshold", default=config.LOW_THRESHOLD, type=type(config.LOW_THRESHOLD), help="low level amplitude threshold in RMS")
-    subparser.add_argument("-mt", "--medium", dest="medium_threshold", default=config.MEDIUM_THRESHOLD, type=type(config.LOW_THRESHOLD), help="medium level amplitude threshold in RMS")
-    subparser.add_argument("-ht", "--high", dest="high_threshold", default=config.HIGH_THRESHOLD, type=type(config.LOW_THRESHOLD), help="high level amplitude threshold in RMS")
+    subparser.add_argument("-low", "--low", dest="low_threshold", default=100, type=int, help="low level amplitude threshold in RMS")
+    subparser.add_argument("-med", "--medium", dest="medium_threshold", default=200, type=int, help="medium level amplitude threshold in RMS")
+    subparser.add_argument("-high", "--high", dest="high_threshold", default=300, type=int, help="high level amplitude threshold in RMS")
 
-    subparser.add_argument("-qc", "--quiet-color", default=config.QUIET_COLOR)
-    subparser.add_argument("-lc", "--low-color", default=config.LOW_COLOR)
-    subparser.add_argument("-mc", "--medium-color", default=config.MEDIUM_COLOR)
-    subparser.add_argument("-hc", "--high-color", default=config.HIGH_COLOR)
+    subparser.add_argument("-qc", "--quiet-color")
+    subparser.add_argument("-lc", "--low-color", default="blue")
+    subparser.add_argument("-mc", "--medium-color", default="yellow")
+    subparser.add_argument("-hc", "--high-color", default="red")
 
 
 def register_mitigate(subparser):
@@ -150,6 +159,11 @@ def register_mitigate(subparser):
         service = Service(Mitigator, load_settings(args))
         service.run()
 
+    DEFAULT_PLAYER = "aplay"
+
+    if platform.system() == "Darwin":
+        DEFAULT_PLAYER = "/Applications/VLC.app/Contents/MacOS/VLC --play-and-exit -"
+
     subparser.set_defaults(func=run)
     register_audio_input_args(subparser)
 
@@ -157,14 +171,14 @@ def register_mitigate(subparser):
     subparser.add_argument("-q", "--quiet", action="store_true", default=False)
 
     subparser.add_argument("-P", "--psycho-mode", action="store_true", default=False, help="Enable analysis when the responses are played. So the mitigator will mitigate itself indefinitely.")
-    subparser.add_argument("-p", "--picking-mode", default=config.PICKING_MODE, choices=["cycle", "random"], help="Define how a specific sound are picked when a level is reached.")
+    subparser.add_argument("-p", "--picking-mode", default="random", choices=["cycle", "random"], help="Define how a specific sound are picked when a level is reached.")
 
-    subparser.add_argument("--player", default=config.PLAYER, help="Path to the player executable. Sounds paths are passed as an argument.")
+    subparser.add_argument("--player", default=DEFAULT_PLAYER, help="Path to the player executable. Sounds paths are passed as an argument.")
 
-    subparser.add_argument("-be", "--beat-every", type=int, default=60, help="Play the '--beat-sound' at a fixed interval. 0 on default, which disable the beat.")
+    subparser.add_argument("-be", "--beat-every", type=int, help="Play the '--beat-sound' at a fixed interval. 0 on default, which disable the beat.")
 #    subparser.add_argument("--reply-delay", type=int)
     subparser.add_argument("--reply-window", type=int, help="minimum interval between two replies, in seconds.")
-    subparser.add_argument("--quiet-hours", default=None, type=valid_int_range, help="quiet hours in which no replies will be triggered.")
+#    subparser.add_argument("--quiet-hours", default=None, type=valid_int_range, help="quiet hours in which no replies will be triggered.")
 
 #    beat_every = subparser.add_mutually_exclusive_group()
 #    beat_every.add_argument("-be", "--beat-every", type=int, default=0, help="Play the '--beat-sound' at a fixed interval. 0 on default, which disable the beat.")
@@ -174,31 +188,24 @@ def register_mitigate(subparser):
 #    subparser.add_argument("--beat-min", default=config.BEAT_MIN, type=type(config.BEAT_MIN), help="Minimum interval for '--beat-random'.")
 #    subparser.add_argument("--beat-max", default=config.BEAT_MAX, type=type(config.BEAT_MAX), help="Maximum interval for '--beat-random'.")
 
-    beat_with = subparser.add_mutually_exclusive_group()
-    beat_with.add_argument("-bs", "--beat-sound", dest="beat_soundfile", default=config.BEAT_SOUND, help="Sound file to play.", type=soundfile_type)
-    beat_with.add_argument("-bf", "--beat-frequency", dest="beat_soundtone", default=config.BEAT_FREQUENCY, help="Frequency to sine.", type=soundtone_type)
-#    beat_with.add_argument("-bff", "--beat-frequency-from", default=config.BEAT_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
+    beat_sound = subparser.add_mutually_exclusive_group()
+    beat_sound.add_argument("-bs", "--beat-sound", dest="beat_soundfile", help="Sound file to play.", type=soundfile_type)
+    beat_sound.add_argument("-bf", "--beat-frequency", dest="beat_soundtone", default="sine:1000hz,25%,1s", help="Frequency to sine.", type=soundtone_type)
 
-    subparser.add_argument("-lt", "--low", dest="low_threshold", default=config.LOW_THRESHOLD, type=type(config.LOW_THRESHOLD), help="Low level amplitude threshold in RMS")
+    subparser.add_argument("-low", "--low", dest="low_threshold", default=100, type=int, help="Low level amplitude threshold in RMS")
     respond_low_with = subparser.add_mutually_exclusive_group()
-    respond_low_with.add_argument("-ls", "--low-sound", dest="low_soundfiles", nargs="*", help="Add a sound to play when low level threshold is raised.")
-    respond_low_with.add_argument("-lf", "--low-frequency", dest="medium_soundtones", nargs="*", default="sine:140hz,25%", help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
-#    respond_low_with.add_argument("-lf", "--low-frequency", default=config.LOW_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
-#    respond_low_with.add_argument("-lff", "--low-frequency-from", default=config.LOW_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
+    respond_low_with.add_argument("-ls", "--low-sound", dest="low_soundfiles", nargs="*", default=[], help="Add a sound file to play when low level threshold is raised.")
+    respond_low_with.add_argument("-lt", "--low-frequency", dest="low_soundtones", nargs="*", default=[soundtone_type("sine:150hz,5s,25%")], help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
 
-    subparser.add_argument("-mt", "--medium", dest="medium_threshold", default=config.MEDIUM_THRESHOLD, type=type(config.LOW_THRESHOLD), help="Medium level amplitude threshold in RMS")
+    subparser.add_argument("-med", "--medium", dest="medium_threshold", default=200, type=int, help="Medium level amplitude threshold in RMS")
     respond_medium_with = subparser.add_mutually_exclusive_group()
-    respond_medium_with.add_argument("-ms", "--medium-sound", dest="medium_soundfiles", nargs="*", help="Add a sound to play when medium level threshold is raised.")
-    respond_medium_with.add_argument("-mf", "--medium-frequency", dest="medium_soundtones", nargs="*", default="sine:140hz,25%", help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
-#    respond_medium_with.add_argument("-mf", "--medium-frequency", default=config.MEDIUM_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
-#    respond_low_with.add_argument("-mff", "--medium-frequency-from", default=config.MEDIUM_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
+    respond_medium_with.add_argument("-ms", "--medium-sound", dest="medium_soundfiles", nargs="*", default=[], help="Add a sound file to play when medium level threshold is raised.")
+    respond_medium_with.add_argument("-mt", "--medium-frequency", dest="medium_soundtones", nargs="*", default=[soundtone_type("damped:500hz,5s,50%")], help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
 
-    subparser.add_argument("-ht", "--high", dest="high_threshold", default=config.HIGH_THRESHOLD, type=type(config.LOW_THRESHOLD), help="High level amplitude threshold in RMS")
+    subparser.add_argument("-high", "--high", dest="high_threshold", default=300, type=int, help="High level amplitude threshold in RMS")
     respond_high_with = subparser.add_mutually_exclusive_group()
-    respond_high_with.add_argument("-hs", "--high-sound", nargs="*", dest="high_soundfiles", help="Add a sound to play when high level threshold is raised.")
-    respond_high_with.add_argument("-hf", "--high-frequency", dest="high_soundtones", nargs="*", default="sine:140hz,25%", help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
-#    respond_high_with.add_argument("-hf", "--high-frequency", default=config.HIGH_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
-#    respond_low_with.add_argument("-hff", "--high-frequency-from", default=config.HIGH_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
+    respond_high_with.add_argument("-hs", "--high-sound", nargs="*", dest="high_soundfiles", default=[], help="Add a sound file to play when high level threshold is raised.")
+    respond_high_with.add_argument("-ht", "--high-frequency", dest="high_soundtones", nargs="*", default=[soundtone_type("square:15hz,5s,75%")], help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
 
 
 def parse_args():
@@ -212,21 +219,22 @@ def parse_args():
     register_mitigate(subparsers.add_parser("mitigate"))
     register_visualize(subparsers.add_parser("visualize"))
 
-    parser.add_argument("--version", action="version", version="%(prog)s {}".format(__VERSION__))
-    parser.add_argument("--loglevel", choices=["debug", "info", "warning", "error", "critical"], default="info")
-    parser.add_argument("--debug", dest="debug", action="store_true", help="debugging mode")
     parser.add_argument("-c", "--config", type=argparse.FileType("rb"), help="config file path")
-    return parser.parse_args()
+    parser.add_argument("-debug", "--debug", action="store_true", help="debugging mode")
+    parser.add_argument("-log", "--loglevel", choices=["debug", "info", "warning", "error", "critical"], default="info")
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s {}".format(__VERSION__))
+    return parser, parser.parse_args()
 
 
 def main():
-    args = parse_args()
+    parser, args = parse_args()
     if not args.command:
-        return
+        parser.print_help()
+        return 127
 
     del args.command
 
-    setup_logging(getattr(logging, "debug" if args.debug else args.loglevel.upper()))
+    setup_logging("debug" if args.debug else args.loglevel.upper())
 
     try:
         args.func(args)

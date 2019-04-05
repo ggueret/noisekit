@@ -3,8 +3,10 @@ import audioop
 import numpy
 
 from termcolor import colored
-from . import levels, config
+from . import levels
 from .audio.input import InputConsumer
+
+DEFAULT_TERM_WIDTH = 80
 
 
 class Visualizer(InputConsumer):
@@ -64,7 +66,7 @@ class Visualizer(InputConsumer):
             context["level"] = self.get_level(context["amplitude"])
 
             infos = info_template.format(**context)
-            max_bars = int((shutil.get_terminal_size((config.DEFAULT_TERM_WIDTH, None))[0] - len(infos) - 2) / 2)
+            max_bars = int((shutil.get_terminal_size((80, None))[0] - len(infos) - 2) / 2)
 
             frequency_variation = abs(context["frequency"] - last_frequency)
 

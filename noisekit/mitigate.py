@@ -36,14 +36,11 @@ class Mitigator(InputConsumer):
         for level in (levels.LOW, levels.MEDIUM, levels.HIGH):
             sounds = []
 
-            for sound_path in settings.get("{}_sounds".format(level.lower()), []):
-                sounds.append(SoundFile(sound_path))
+            for soundfile in settings.get("{}_soundfiles".format(level.lower()), []):
+                sounds.append(SoundFile(**soundfile))
 
-            if not sounds:
-                sounds.append(SoundTone(
-                    frequency=settings["{}_frequency".format(level.lower())],
-                    amplitude=0.5,
-                ))
+            for soundtone in settings.get("{}_soundtones".format(level.lower()), []):
+                sounds.append(SoundTone(**soundtone))
 
             self.sounds[level] = picker(sounds)
 
@@ -62,15 +59,19 @@ class Mitigator(InputConsumer):
 
         self.producer.start()
 
-        self.logger.info("thresholds: low[%(LOW)i] medium[%(MEDIUM)i] high[%(HIGH)i]", self.thresholds)
+        self.logger.info("Mitigator is listening...")
+        self.logger.debug("thresholds: low[%(LOW)i] medium[%(MEDIUM)i] high[%(HIGH)i]", self.thresholds)
+
+        # one block duration in millisecond
+        block_duration = int((self.settings["frames_per_buffer"] / self.settings["rate"]) * 1000)
 
         while not self.shutdown_flag.is_set() and self.producer.is_alive():
             context = {}
-            context["state"] = states.PLAYING if self.producer.is_active.is_set() else states.LISTENING
+            context["state"] = states.REPLYING if self.producer.is_active.is_set() else states.LISTENING
 
             samples = self.read(self.settings["frames_per_buffer"])
 
-            if context["state"] == states.PLAYING and not self.is_psycho:
+            if context["state"] == states.REPLYING and not self.is_psycho:
                 self.last_block_playing = True
                 continue
 
