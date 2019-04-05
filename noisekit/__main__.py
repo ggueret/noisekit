@@ -230,7 +230,7 @@ def main():
     parser, args = parse_args()
     if not args.command:
         parser.print_help()
-        return 127
+        return
 
     del args.command
 
@@ -241,8 +241,8 @@ def main():
 
     except Exception:
         logging.exception("noisekit ended abruptly.")
-
+        return 127
 
 if __name__ == "__main__":
 
-    main()
+    exit(main())
