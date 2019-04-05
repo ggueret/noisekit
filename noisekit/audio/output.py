@@ -29,12 +29,28 @@ class OutputProducer(BaseThread):
     def enqueue(self, sound):
         self.queue.put_nowait(sound)
 
+    def sleep_for(self, total, every=0.1):
+        loops, remainder = divmod(total, every)
+
+        for i in [every for i in range(int(loops))] + [remainder]:
+
+            if self.shutdown_flag.is_set():
+                break
+
+            time.sleep(i)
+
     def play(self, sound, latency=0):
         self.is_active.set()
         # apply some latency if needed.
-        time.sleep(latency)
+        self.sleep_for(max(0, latency))
+
+        # case where the thread is requested on a sleep
+        if self.shutdown_flag.is_set():
+            return
 
         self.last_active = time.time()
+
+        process_start = time.time()
         process = subprocess.Popen(self.player_command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
 
         for chunk in sound.read(1024):
@@ -43,6 +59,7 @@ class OutputProducer(BaseThread):
         process.communicate()
         process.stdin.close()
 
+        self.logger.debug("played %s in %.2fs, latency: %.2fs", sound, time.time() - process_start, latency)
         self.is_active.clear()
 
     def run(self):
@@ -62,7 +79,9 @@ class OutputProducer(BaseThread):
                 continue
 
             enqueued_at, sound = sound_job
-            self.play(sound, latency=max(0, self.settings["reply_latency"] - time.time() - enqueued_at))
+            dequeue_delay = time.time() - enqueued_at
+            self.logger.debug("dequeued %s, delay: %.5f", sound, dequeue_delay)
+            self.play(sound, latency=self.settings["reply_latency"] - dequeue_delay)
             self.queue.task_done()
 
         self.logger.debug("stopped the output producer.")
