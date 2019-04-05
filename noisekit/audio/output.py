@@ -29,10 +29,15 @@ class OutputProducer(BaseThread):
     def enqueue(self, sound):
         self.queue.put_nowait(sound)
 
-    def play(self, sound):
+    def play(self, sound, enqueued_at):
         self.is_active.set()
-        self.last_active = time.time()
 
+        elapsed_seconds = int(time.time() - enqueued_at)
+
+        # apply some latency if needed.
+        time.sleep(self.settings["reply_latency"] - elapsed_seconds)
+
+        self.last_active = time.time()
         process = subprocess.Popen(self.player_command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
 
         for chunk in sound.read(1024):
@@ -46,7 +51,10 @@ class OutputProducer(BaseThread):
     def run(self):
         while not self.shutdown_flag.is_set():
             try:
-                sound = self.queue.get(timeout=0.1)
+                sound_job = self.queue.get(timeout=0.1)
+
+                if sound_job is None:
+                    break
 
             except queue.Empty:
 
@@ -56,10 +64,8 @@ class OutputProducer(BaseThread):
 
                 continue
 
-            if sound is None:
-                break
-
-            self.play(sound)
+            enqueued_at, sound = sound_job
+            self.play(sound, enqueued_at)
             self.queue.task_done()
 
         self.logger.debug("stopped the output producer.")

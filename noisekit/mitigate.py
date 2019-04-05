@@ -47,7 +47,7 @@ class Mitigator(InputConsumer):
         self.record_to = self.settings["record"]  # todo
         self.is_quiet = None
         self.is_psycho = self.settings["psycho_mode"]
-        self.last_block_playing = False
+        self.skip_next_block = False
 
     def get_level(self, rms):
         for level in (levels.HIGH, levels.MEDIUM, levels.LOW):
@@ -72,11 +72,11 @@ class Mitigator(InputConsumer):
             samples = self.read(self.settings["frames_per_buffer"])
 
             if context["state"] == states.REPLYING and not self.is_psycho:
-                self.last_block_playing = True
+                self.skip_next_block = True
                 continue
 
-            if self.last_block_playing:
-                self.last_block_playing = False
+            if self.skip_next_block:
+                self.skip_next_block = False
                 continue
 
             context["amplitude"] = audioop.rms(samples, self.audio.get_sample_size(self.format_type))
@@ -88,11 +88,11 @@ class Mitigator(InputConsumer):
             if context["level"] is not levels.QUIET:
                 context["staged"] = next(self.sounds[context["level"]])
 
+            context["timestamp"] = time.time()
+
             if context["staged"]:
                 self.logger.info("%(level)s level reached with %(amplitude)i RMS @ %(frequency)i Hz. Playing: %(staged)s.", context)
-                self.producer.enqueue(context["staged"])
-
-            context["timestamp"] = time.time()
+                self.producer.enqueue((context["timestamp"], context["staged"]))
 
         self.producer.shutdown_flag.set()
         self.producer.join()

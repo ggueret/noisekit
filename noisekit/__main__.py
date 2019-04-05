@@ -104,7 +104,7 @@ def amplitude_as_percentage(raw_args):
 def register_audio_input_args(subparser):
     subparser.add_argument("-f", "--frames-per-buffer", default=1024, type=int)
     subparser.add_argument("-r", "--rate", default=44100, type=int)
-#    subparser.add_argument("--channels", default=1, type=int_range(0, 1))
+#    subparser.add_argument("--channels", default=1, type=int_range(0, 1))  # useful to record stereo?
     subparser.add_argument("--format", dest="sample_format", default="Int16", choices=["Float32", "Int32", "Int24", "Int16", "UInt8"], help="PyAudio format type")
     subparser.add_argument("-no", "--no-overflow", action="store_true", default=False)
 
@@ -176,7 +176,7 @@ def register_mitigate(subparser):
     subparser.add_argument("--player", default=DEFAULT_PLAYER, help="Path to the player executable. Sounds paths are passed as an argument.")
 
     subparser.add_argument("-be", "--beat-every", type=int, help="Play the '--beat-sound' at a fixed interval. 0 on default, which disable the beat.")
-#    subparser.add_argument("--reply-delay", type=int)
+    subparser.add_argument("-rl", "--reply-latency", default=0, type=int, help="seconds to wait before playing a triggered reply sound.")
     subparser.add_argument("--reply-window", type=int, help="minimum interval between two replies, in seconds.")
 #    subparser.add_argument("--quiet-hours", default=None, type=valid_int_range, help="quiet hours in which no replies will be triggered.")
 
