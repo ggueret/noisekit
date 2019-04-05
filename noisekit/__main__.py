@@ -1,6 +1,7 @@
 """
 """
 from __future__ import absolute_import
+import re
 import os
 import sys
 import json
@@ -14,7 +15,7 @@ from .audio.sound import WAVE_GENERATORS
 
 
 def setup_logging(level):
-    format_tpl = "[%(levelname)s] %(name)s ~ %(message)s"
+    format_tpl = "[%(levelname)s] ~ %(message)s"
 
     # in runned by systemd, there is no reason to display datetime to syslog
     if os.getppid() != 1:
@@ -41,12 +42,44 @@ def load_settings(args):
     return merged_config
 
 
-def valid_int_range(raw_args):
-    minimum, maximum = raw_args.split("-", 1)
-    return int(minimum), int(maximum)
+def soundfile_type(value):
+    if not os.path.isfile(value):
+        raise argparse.ArgumentTypeError(f"Sound file not found: {value}.")
 
-#    raise argparse.ArgumentTypeError()
-#    return map(int, raw_args.split("-", 1))
+    return {"path": value}
+
+
+def soundtone_type(value):
+    """
+    Parse tone sounds parameters from args.
+
+    value: 'square:90hz,10s,100%'
+    returns: {'waveform': 'square', 'frequency': '90', 'amplitude': '100'}'
+    """
+    abbr_map = {"hz": "frequency", "%": "amplitude", "s": "duration"}
+    tone_form, generator_raw_params = value.lower().split(":", 1)
+
+    parameters = {"waveform": tone_form}
+
+    for param in generator_raw_params.split(","):
+        match = re.match(r"(\d+)(\D+)$", param)
+
+        if not match:
+            raise argparse.ArgumentTypeError(f"invalid tone parameter, format: '{generator_raw_params}'.")
+
+        param_name, param_value = abbr_map[match.group(2)], int(match.group(1))
+
+        if param_name == "amplitude":
+            param_value = param_value / 100
+
+        parameters[param_name] = param_value
+
+    return parameters
+
+
+def valid_int_range(value):
+    start, end = value.split("-", 1)
+    return int(start), int(end)
 
 
 def amplitude_as_percentage(raw_args):
@@ -59,17 +92,9 @@ def amplitude_as_percentage(raw_args):
     return value / 100
 
 
-def run(args):
-    from . import NoisyBuddy
-#    setup_logging(getattr(logging, args.log_level.upper()) if not args.visualize else logging.CRITICAL)
-    knocked = NoisyBuddy(**load_settings(args))
-    knocked.run()
-
-
 def register_audio_input_args(subparser):
-    # To capture low frequencies, requires a highter value, eg 10Hz was done in 0.1 seconds.
     subparser.add_argument("-f", "--frames-per-buffer", default=config.FRAMES_PER_BUFFER, type=type(config.FRAMES_PER_BUFFER))
-    subparser.add_argument("-r", "--rate", default=config.RATE, type=type(config.RATE))
+    subparser.add_argument("-r", "--rate", default=config.RATE, type=int)
 #    subparser.add_argument("--channels", default=config.CHANNELS, type=type(config.CHANNELS))
     subparser.add_argument("--format", dest="sample_format", default=config.SAMPLE_FORMAT, choices=["Float32", "Int32", "Int24", "Int16", "UInt8"], help="PyAudio format type")
     subparser.add_argument("-no", "--no-overflow", action="store_true", default=False)
@@ -88,10 +113,11 @@ def register_generate(subparser):
     subparser.add_argument("--frequency", default="90", help="frequency in hertz")
     subparser.add_argument("--rate", default=44100, type=int, help="frame rate")
     subparser.add_argument("--waveform", default="sine", choices=WAVE_GENERATORS.keys())
-    subparser.add_argument("output", type=argparse.FileType('wb'), default=sys.stdout, help="destination file")
+    subparser.add_argument("output", type=argparse.FileType('wb'), help="destination file")
 
 
 def register_visualize(subparser):
+
     def run(args):
         from .visualize import Visualizer
         service = Service(Visualizer, load_settings(args))
@@ -136,6 +162,9 @@ def register_mitigate(subparser):
     subparser.add_argument("--player", default=config.PLAYER, help="Path to the player executable. Sounds paths are passed as an argument.")
 
     subparser.add_argument("-be", "--beat-every", type=int, default=60, help="Play the '--beat-sound' at a fixed interval. 0 on default, which disable the beat.")
+#    subparser.add_argument("--reply-delay", type=int)
+    subparser.add_argument("--reply-window", type=int, help="minimum interval between two replies, in seconds.")
+    subparser.add_argument("--quiet-hours", default=None, type=valid_int_range, help="quiet hours in which no replies will be triggered.")
 
 #    beat_every = subparser.add_mutually_exclusive_group()
 #    beat_every.add_argument("-be", "--beat-every", type=int, default=0, help="Play the '--beat-sound' at a fixed interval. 0 on default, which disable the beat.")
@@ -146,50 +175,30 @@ def register_mitigate(subparser):
 #    subparser.add_argument("--beat-max", default=config.BEAT_MAX, type=type(config.BEAT_MAX), help="Maximum interval for '--beat-random'.")
 
     beat_with = subparser.add_mutually_exclusive_group()
-    beat_with.add_argument("-bs", "--beat-sound", default=config.BEAT_SOUND, help="Sound file to play.")
-    beat_with.add_argument("-bf", "--beat-frequency", default=config.BEAT_FREQUENCY, help="Frequency to sine.")
+    beat_with.add_argument("-bs", "--beat-sound", dest="beat_soundfile", default=config.BEAT_SOUND, help="Sound file to play.", type=soundfile_type)
+    beat_with.add_argument("-bf", "--beat-frequency", dest="beat_soundtone", default=config.BEAT_FREQUENCY, help="Frequency to sine.", type=soundtone_type)
+#    beat_with.add_argument("-bff", "--beat-frequency-from", default=config.BEAT_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
 
     subparser.add_argument("-lt", "--low", dest="low_threshold", default=config.LOW_THRESHOLD, type=type(config.LOW_THRESHOLD), help="Low level amplitude threshold in RMS")
     respond_low_with = subparser.add_mutually_exclusive_group()
-    respond_low_with.add_argument("-ls", "--low-sound", dest="low_sounds", nargs="*", help="Add a sound to play when low level threshold is raised.")
-    respond_low_with.add_argument("-lf", "--low-frequency", default=config.LOW_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
+    respond_low_with.add_argument("-ls", "--low-sound", dest="low_soundfiles", nargs="*", help="Add a sound to play when low level threshold is raised.")
+    respond_low_with.add_argument("-lf", "--low-frequency", dest="medium_soundtones", nargs="*", default="sine:140hz,25%", help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
+#    respond_low_with.add_argument("-lf", "--low-frequency", default=config.LOW_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
+#    respond_low_with.add_argument("-lff", "--low-frequency-from", default=config.LOW_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
 
     subparser.add_argument("-mt", "--medium", dest="medium_threshold", default=config.MEDIUM_THRESHOLD, type=type(config.LOW_THRESHOLD), help="Medium level amplitude threshold in RMS")
     respond_medium_with = subparser.add_mutually_exclusive_group()
-    respond_medium_with.add_argument("-ms", "--medium-sound", dest="medium_sounds", nargs="*", help="Add a sound to play when medium level threshold is raised.")
-    respond_medium_with.add_argument("-mf", "--medium-frequency", default=config.MEDIUM_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
+    respond_medium_with.add_argument("-ms", "--medium-sound", dest="medium_soundfiles", nargs="*", help="Add a sound to play when medium level threshold is raised.")
+    respond_medium_with.add_argument("-mf", "--medium-frequency", dest="medium_soundtones", nargs="*", default="sine:140hz,25%", help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
+#    respond_medium_with.add_argument("-mf", "--medium-frequency", default=config.MEDIUM_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
+#    respond_low_with.add_argument("-mff", "--medium-frequency-from", default=config.MEDIUM_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
 
     subparser.add_argument("-ht", "--high", dest="high_threshold", default=config.HIGH_THRESHOLD, type=type(config.LOW_THRESHOLD), help="High level amplitude threshold in RMS")
     respond_high_with = subparser.add_mutually_exclusive_group()
-    respond_high_with.add_argument("-hs", "--high-sound", nargs="*", dest="high_sounds", help="Add a sound to play when high level threshold is raised.")
-    respond_high_with.add_argument("-hf", "--high-frequency", default=config.HIGH_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
-
-
-def install(args):
-
-    template = """[Service]
-Type=simple
-User={user}
-Group={group}
-ExecStart={binary} run --config=/root/noisekit.config.json
-
-[Unit]
-Description=knocked
-After=syslog.target
-
-[Install]
-WantedBy=multi-user.target"""
-
-    context = {}
-    context["binary"] = sys.argv[0]
-    context["user"], context["group"] = args.user, args.group
-
-#    with open(os.path.join(BASEDIR_PATH, os.pardir, "noisekit.service"), "r") as f:
-#        template = f.read()
-
-    # check if systemd is used.
-    with open("/etc/systemd/system/noisekit.service", "w") as f:
-        f.write(template.format(**context))
+    respond_high_with.add_argument("-hs", "--high-sound", nargs="*", dest="high_soundfiles", help="Add a sound to play when high level threshold is raised.")
+    respond_high_with.add_argument("-hf", "--high-frequency", dest="high_soundtones", nargs="*", default="sine:140hz,25%", help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
+#    respond_high_with.add_argument("-hf", "--high-frequency", default=config.HIGH_FREQUENCY, help="Frequency to sine when no sound are specified for the level.")
+#    respond_low_with.add_argument("-hff", "--high-frequency-from", default=config.HIGH_FREQUENCY_FORM, choices=WAVE_GENERATORS.keys(), help="generator to use for the waveform.")
 
 
 def parse_args():
@@ -200,12 +209,13 @@ def parse_args():
     )
     subparsers = parser.add_subparsers(dest="command", help="commands")
     register_generate(subparsers.add_parser("generate"))
-    register_visualize(subparsers.add_parser("visualize"))
     register_mitigate(subparsers.add_parser("mitigate"))
+    register_visualize(subparsers.add_parser("visualize"))
 
-    parser.add_argument("--version", action="version", version="%(prog)s {}".format(__name__))
+    parser.add_argument("--version", action="version", version="%(prog)s {}".format(__VERSION__))
     parser.add_argument("--loglevel", choices=["debug", "info", "warning", "error", "critical"], default="info")
-    parser.add_argument("-c", "--config", type=argparse.FileType("rb"))
+    parser.add_argument("--debug", dest="debug", action="store_true", help="debugging mode")
+    parser.add_argument("-c", "--config", type=argparse.FileType("rb"), help="config file path")
     return parser.parse_args()
 
 
@@ -214,18 +224,16 @@ def main():
     if not args.command:
         return
 
-    setup_logging(getattr(logging, args.loglevel.upper()))
-    logging.info("[~] starting %s module of noisekit v%s", args.command, __VERSION__)
-
     del args.command
+
+    setup_logging(getattr(logging, "debug" if args.debug else args.loglevel.upper()))
+
     try:
         args.func(args)
 
     except Exception:
-        logging.exception("noisekit exited abruptly:")
-        raise
+        logging.exception("noisekit ended abruptly.")
 
-#    logging.info("noisekit exited properly.")
 
 if __name__ == "__main__":
 
