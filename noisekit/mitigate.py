@@ -55,6 +55,11 @@ class Mitigator(InputConsumer):
                 return level
         return levels.QUIET
 
+    def get_current_state(self):
+        if self.producer.is_active.is_set():
+            return states.REPLYING
+        return states.LISTENING
+
     def run(self):
 
         self.producer.start()
@@ -67,7 +72,7 @@ class Mitigator(InputConsumer):
 
         while not self.shutdown_flag.is_set() and self.producer.is_alive():
             context = {}
-            context["state"] = states.REPLYING if self.producer.is_active.is_set() else states.LISTENING
+            context["state"] = self.get_current_state()
 
             samples = self.read(self.settings["frames_per_buffer"])
 
