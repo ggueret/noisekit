@@ -84,8 +84,11 @@ class Mitigator(InputConsumer):
             context["level"] = self.get_level(context["amplitude"])
             context["staged"] = None
 
-            #  and context["frequency"] > 19
             if context["level"] is not levels.QUIET:
+                if context["frequency"] < 20 or context["frequency"] > 20000:
+                    self.logger.info("dropped block, from frequency: %i", context["frequency"])
+                    continue
+
                 context["staged"] = next(self.sounds[context["level"]])
 
             context["timestamp"] = time.time()

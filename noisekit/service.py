@@ -29,6 +29,7 @@ class Service(object):
         self.thread.join()
 
     def stop(self, *args):
+        self.logger.info("termination requested by user.")
         self.is_alive = False
 
     def register_signals(self):
