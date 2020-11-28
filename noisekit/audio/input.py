@@ -1,5 +1,8 @@
 import numpy
+import math
+import audioop
 import pyaudio
+from collections import deque
 from ..service import BaseThread
 
 
@@ -13,7 +16,7 @@ class InputConsumer(BaseThread):
         self.stream = self.audio.open(
             input=True,
             format=self.format_type,  # sample format
-            channels=1,  # fixme: must be passed from settings
+            channels=settings["channels"],  # fixme: must be passed from settings
             rate=settings["rate"],
             frames_per_buffer=settings["frames_per_buffer"]
         )
@@ -38,6 +41,38 @@ class InputConsumer(BaseThread):
 
     def read(self, length):
         return self.stream.read(length, exception_on_overflow=self.settings["no_overflow"])
+
+    def listen(self, chuck_size, threshold, max_silence_time=1, max_silence_count=3):
+        seconds_per_buffer = self.settings["frames_per_buffer"] / self.settings["rate"]
+        previous_samples = deque(maxlen=math.ceil(1.0 / seconds_per_buffer))
+        captured_samples = []
+
+        is_acquiring = False
+        silence_time = 0
+        silence_count = 0
+
+        while not self.shutdown_flag.is_set():
+
+            sample = self.read(chuck_size)
+            energy = audioop.rms(sample, self.audio.get_sample_size(self.format_type))
+
+            if energy >= threshold:
+                silence_time = 0
+                is_acquiring = True
+                captured_samples.append(sample)
+
+            elif is_acquiring is True:
+                silence_time += seconds_per_buffer
+                if silence_time >= max_silence_time:
+                    break
+
+                captured_samples.append(sample)
+
+            else:
+                previous_samples.append(sample)
+
+        if captured_samples:
+            return list(previous_samples) + captured_samples
 
 
 class Recorder(object):

@@ -103,7 +103,7 @@ def amplitude_as_percentage(raw_args):
 def register_audio_input_args(subparser):
     subparser.add_argument("-f", "--frames-per-buffer", default=1024, type=int)
     subparser.add_argument("-r", "--rate", default=44100, type=int)
-#    subparser.add_argument("--channels", default=1, type=int_range(0, 1))  # useful to record stereo?
+    subparser.add_argument("--channels", default=1, type=int)
     subparser.add_argument("--format", dest="sample_format", default="Int16", choices=["Float32", "Int32", "Int24", "Int16", "UInt8"], help="PyAudio format type")
     subparser.add_argument("-no", "--no-overflow", action="store_true", default=False)
 
@@ -207,6 +207,18 @@ def register_mitigate(subparser):
     respond_high_with.add_argument("-ht", "--high-frequency", dest="high_soundtones", nargs="*", default=[soundtone_type("square:15hz,5s,75%")], help="Frequency to sine when no sound are specified for the level.", type=soundtone_type)
 
 
+def register_monitor(subparser):
+
+    def run(args):
+        from .monitor import Monitor
+        service = Service(Monitor, load_settings(args))
+        service.run()
+
+    subparser.set_defaults(func=run)
+    register_audio_input_args(subparser)
+
+    subparser.add_argument("-t", "--threshold", default=100, type=int, help="Threshold to start acquiring a sound in RMS")
+
 def parse_args():
 
     parser = argparse.ArgumentParser(
@@ -217,6 +229,7 @@ def parse_args():
     register_generate(subparsers.add_parser("generate"))
     register_mitigate(subparsers.add_parser("mitigate"))
     register_visualize(subparsers.add_parser("visualize"))
+    register_monitor(subparsers.add_parser("monitor"))
 
     parser.add_argument("-c", "--config", type=argparse.FileType("rb"), help="config file path")
     parser.add_argument("-debug", "--debug", action="store_true", help="debugging mode")
